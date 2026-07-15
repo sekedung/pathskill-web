@@ -24,6 +24,7 @@ export interface ModuleLesson {
   title: string;
   type: "video" | "reading" | "quiz";
   duration_minutes: number;
+  completed: boolean;
 }
 
 export interface ModuleAssignment {
@@ -32,6 +33,8 @@ export interface ModuleAssignment {
   description: string | null;
   due_date: string | null;
   status: "pending" | "submitted" | "successful";
+  file_name: string | null;
+  file_url: string | null;
 }
 
 export interface ModuleDetailResponse {

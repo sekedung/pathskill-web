@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import api from "@/lib/api";
 import type { ModuleDetailResponse } from "@/types/learning-path";
@@ -14,6 +14,7 @@ const STATUS_STYLE: Record<string, string> = {
 export default function ModuleDetailPage() {
   const { moduleId } = useParams<{ moduleId: string }>();
   const router = useRouter();
+  const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
   const [data, setData] = useState<ModuleDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,8 +38,10 @@ export default function ModuleDetailPage() {
     fetchModule();
   }, [moduleId]);
 
-  async function handleCompleteLesson(lessonId: number) {
+  async function handleCompleteLesson(lessonId: number, alreadyCompleted: boolean) {
+    if (alreadyCompleted) return; // sudah selesai, nggak perlu request ulang
     setBusyId(lessonId);
+    setError(null);
     try {
       await api.post(`/lessons/${lessonId}/complete`);
       await fetchModule();
@@ -49,15 +52,35 @@ export default function ModuleDetailPage() {
     }
   }
 
-  async function handleSubmitAssignment(assignmentId: number) {
+  function triggerFilePicker(assignmentId: number) {
+    fileInputRefs.current[assignmentId]?.click();
+  }
+
+  async function handleFileSelected(
+    assignmentId: number,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
     setBusyId(assignmentId);
+    setError(null);
     try {
-      await api.post(`/assignments/${assignmentId}/submit`);
+      const formData = new FormData();
+      formData.append("file", file);
+      // JANGAN set Content-Type manual di sini — axios otomatis mendeteksi
+      // FormData dan menyertakan boundary yang benar. Kalau di-override manual
+      // jadi "multipart/form-data" tanpa boundary, request gagal di-parse backend.
+      await api.post(`/assignments/${assignmentId}/submit`, formData);
       await fetchModule();
-    } catch {
-      setError("Gagal submit assignment.");
+    } catch (err: any) {
+      setError(
+        err.response?.data?.message ??
+          "Gagal upload file. Pastikan format pdf/doc/docx/zip/jpg/png dan ukuran maksimal 10MB."
+      );
     } finally {
       setBusyId(null);
+      e.target.value = ""; // reset input biar bisa pilih file sama lagi kalau perlu resubmit
     }
   }
 
@@ -100,7 +123,7 @@ export default function ModuleDetailPage() {
           </div>
           <div className="w-full bg-gray-200 rounded-full h-1.5">
             <div
-              className="bg-blue-600 h-1.5 rounded-full"
+              className="bg-blue-600 h-1.5 rounded-full transition-all"
               style={{ width: `${data.progress_percentage}%` }}
             />
           </div>
@@ -113,21 +136,34 @@ export default function ModuleDetailPage() {
               key={lesson.id}
               className="flex items-center justify-between border-b border-gray-100 py-3 last:border-0"
             >
-              <div>
-                <p className="text-sm font-medium text-[#0B1739]">
-                  {lesson.title}
-                </p>
-                <p className="text-xs text-gray-400">
-                  {lesson.duration_minutes} min
-                </p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => handleCompleteLesson(lesson.id, lesson.completed)}
+                  disabled={busyId === lesson.id}
+                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                    lesson.completed
+                      ? "bg-green-500 border-green-500 text-white"
+                      : "border-gray-300"
+                  }`}
+                  aria-label={lesson.completed ? "Selesai" : "Tandai selesai"}
+                >
+                  {lesson.completed && "✓"}
+                </button>
+                <div>
+                  <p
+                    className={`text-sm font-medium ${
+                      lesson.completed
+                        ? "text-gray-400 line-through"
+                        : "text-[#0B1739]"
+                    }`}
+                  >
+                    {lesson.title}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {lesson.duration_minutes} min · {lesson.type}
+                  </p>
+                </div>
               </div>
-              <button
-                onClick={() => handleCompleteLesson(lesson.id)}
-                disabled={busyId === lesson.id}
-                className="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg disabled:opacity-50"
-              >
-                {lesson.type}
-              </button>
             </div>
           ))}
         </div>
@@ -159,14 +195,39 @@ export default function ModuleDetailPage() {
                   Due: {assignment.due_date}
                 </p>
               )}
+
+              {assignment.file_name && (
+                <a
+                  href={assignment.file_url ?? "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 underline block mb-2"
+                >
+                  📎 {assignment.file_name}
+                </a>
+              )}
+
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,.zip,.jpg,.jpeg,.png"
+                className="hidden"
+                ref={(el) => {
+                  fileInputRefs.current[assignment.id] = el;
+                }}
+                onChange={(e) => handleFileSelected(assignment.id, e)}
+              />
               <button
-                onClick={() => handleSubmitAssignment(assignment.id)}
+                onClick={() => triggerFilePicker(assignment.id)}
                 disabled={
                   busyId === assignment.id || assignment.status === "successful"
                 }
                 className="text-xs bg-blue-600 disabled:bg-gray-300 text-white px-3 py-1.5 rounded-lg"
               >
-                ⬆ Upload Assignment
+                {busyId === assignment.id
+                  ? "Mengupload..."
+                  : assignment.file_name
+                  ? "⬆ Upload Ulang"
+                  : "⬆ Upload Assignment"}
               </button>
             </div>
           ))}

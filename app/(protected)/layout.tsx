@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import AppHeader from "@/components/AppHeader";
 
 export default function ProtectedLayout({
   children,
@@ -32,5 +33,10 @@ export default function ProtectedLayout({
     return null; // sudah di-redirect lewat useEffect di atas
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <AppHeader />
+      {children}
+    </>
+  );
 }
