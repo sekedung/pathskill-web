@@ -17,15 +17,21 @@ const STATUS_STYLE: Record<string, string> = {
   successful: "bg-green-100 text-green-700",
 };
 
-// Tahapan pengerjaan assignment. "done" dihitung dari data asli, bukan
-// asal dicentang semua — Latihan Coding & Mini Project belum ada
-// fiturnya, jadi untuk sekarang selalu tampil belum selesai.
+// Tahapan pengerjaan assignment. "done" dihitung dari data asli.
+// Mini Project tidak punya submission tersendiri — briefnya cuma dibaca
+// sekali sebelum Pengumpulan, jadi statusnya "selesai" ikut status
+// pengumpulan tugas (submitted/successful), bukan flag terpisah.
 function getAlurTugas(data: AssignmentDetailResponse) {
+  const sudahDikumpulkan =
+    data.status === "submitted" || data.status === "successful";
   return [
     { label: "Kuis", done: data.has_quiz && data.quiz_completed },
-    { label: "Latihan Coding", done: false },
-    { label: "Mini Project", done: false },
-    { label: "Pengumpulan", done: data.status === "submitted" || data.status === "successful" },
+    {
+      label: "Latihan Coding",
+      done: data.has_coding_exercise && data.coding_exercise_completed,
+    },
+    { label: "Mini Project", done: data.has_mini_project && sudahDikumpulkan },
+    { label: "Pengumpulan", done: sudahDikumpulkan },
     { label: "Hasil Review", done: data.status === "successful" },
   ];
 }
@@ -61,11 +67,27 @@ export default function AssignmentDetailPage() {
   }, [assignmentId]);
 
   function handleStart() {
-    // Kalau assignment ini punya Quiz, alur baru: Quiz dulu sebelum upload.
-    // Assignment lama yang belum punya Quiz/Coding Exercise tetap fallback
-    // ke upload langsung, biar gak putus alurnya sebelum semua tahap jadi.
-    if (data?.has_quiz) {
+    // Alur berantai: Kuis -> Latihan Coding -> Mini Project -> Pengumpulan.
+    // Assignment lama yang belum punya salah satu tahap tetap fallback ke
+    // tahap berikutnya, biar gak putus alurnya sebelum semua tahap jadi.
+    if (!data) return;
+
+    if (data.has_quiz && !data.quiz_completed) {
       router.push(`/learning-path/${moduleId}/assignments/${assignmentId}/quiz`);
+      return;
+    }
+    if (data.has_coding_exercise && !data.coding_exercise_completed) {
+      router.push(
+        `/learning-path/${moduleId}/assignments/${assignmentId}/coding-exercise`
+      );
+      return;
+    }
+    // Mini Project cuma ditampilkan sekali sebelum Pengumpulan pertama kali;
+    // kalau lagi kirim ulang tugas (status sudah submitted), langsung ke upload.
+    if (data.has_mini_project && data.status === "pending") {
+      router.push(
+        `/learning-path/${moduleId}/assignments/${assignmentId}/mini-project`
+      );
       return;
     }
     fileInputRef.current?.click();
@@ -137,7 +159,7 @@ export default function AssignmentDetailPage() {
         </div>
 
         {/* Learning Outcomes */}
-        {data.learning_outcomes.length > 0 && (
+        {Array.isArray(data.learning_outcomes) && data.learning_outcomes.length > 0 && (
           <div className="bg-white rounded-2xl p-5 mb-4">
             <h2 className="font-bold text-[#0B1739] mb-3">
               🎯 Learning Outcomes
@@ -154,7 +176,7 @@ export default function AssignmentDetailPage() {
         )}
 
         {/* Skills Learned */}
-        {data.skills_learned.length > 0 && (
+        {Array.isArray(data.skills_learned) && data.skills_learned.length > 0 && (
           <div className="bg-white rounded-2xl p-5 mb-4">
             <h2 className="font-bold text-[#0B1739] mb-3">Skills Learned</h2>
             <div className="flex flex-wrap gap-2">
@@ -171,7 +193,7 @@ export default function AssignmentDetailPage() {
         )}
 
         {/* Prerequisites */}
-        {data.prerequisites.length > 0 && (
+        {Array.isArray(data.prerequisites) && data.prerequisites.length > 0 && (
           <div className="bg-white rounded-2xl p-5 mb-4">
             <h2 className="font-bold text-[#0B1739] mb-3">Prerequisites</h2>
             <div className="flex flex-wrap gap-2">
@@ -188,7 +210,7 @@ export default function AssignmentDetailPage() {
         )}
 
         {/* Tools */}
-        {data.tools.length > 0 && (
+        {Array.isArray(data.tools) && data.tools.length > 0 && (
           <div className="bg-white rounded-2xl p-5 mb-4">
             <h2 className="font-bold text-[#0B1739] mb-3">Tools</h2>
             <div className="flex flex-wrap gap-2">
@@ -205,7 +227,7 @@ export default function AssignmentDetailPage() {
         )}
 
         {/* Evaluation Rubrics */}
-        {data.evaluation_rubrics.length > 0 && (
+        {Array.isArray(data.evaluation_rubrics) && data.evaluation_rubrics.length > 0 && (
           <div className="bg-white rounded-2xl p-5 mb-4">
             <h2 className="font-bold text-[#0B1739] mb-3">
               📊 Evaluation Rubrics

@@ -5,6 +5,9 @@ export interface CodingExerciseResponse {
   description: string | null;
   learning_objectives: string[];
   requirements: string[];
+  // checklist self-check manual, bukan hasil eksekusi otomatis — belum ada
+  // compile/run engine, jadi ini cuma panduan buat ngecek kode sendiri
+  test_cases: string[];
   language: string;
   starter_code: string | null;
   hint: string | null;

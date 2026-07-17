@@ -18,6 +18,7 @@ export interface AssignmentDetailResponse {
   has_quiz: boolean;
   has_coding_exercise: boolean;
   coding_exercise_completed: boolean;
+  has_mini_project: boolean;
   quiz_completed: boolean;
   status: "pending" | "submitted" | "successful";
   file_name: string | null;
